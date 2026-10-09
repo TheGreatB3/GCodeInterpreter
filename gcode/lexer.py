@@ -5,7 +5,7 @@ import re
 @dataclass(frozen=True)
 class Word:
     letter: str
-    value: float
+    value: float | str
 
 
 @dataclass(frozen=True)
@@ -20,7 +20,14 @@ TOKEN_PATTERN = re.compile(
     (?P<whitespace>\s+)
     | (?P<semicolon_comment>;[^\n]*)
     | (?P<paren_comment>\([^)]*\))
-    | (?P<word>[A-Za-z][+-]?(?:\d+(?:\.\d*)?|\.\d+))
+    | (?P<word>
+        [A-Za-z]
+        (?:
+            "(?:[^"\\]|\\.)*"
+            |
+            [+-]?(?:\d+(?:\.\d*)?|\.\d+)
+        )
+    )
     """,
     re.VERBOSE,
 )
@@ -54,10 +61,17 @@ def lex_line(source: str) -> list[Token]:
 
         if match.lastgroup == "word":
             text = match.group()
+            raw_value = text[1:]
+
+            if raw_value.startswith('"'):
+                value = raw_value[1:-1]
+            else:
+                value = float(raw_value)
+
             tokens.append(
                 Word(
                     letter=text[0].upper(),
-                    value=float(text[1:]),
+                    value=value,
                 )
             )
 
