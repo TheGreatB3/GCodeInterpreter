@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from gcode.command import MoveEvent
+from gcode.machine_event import MoveEvent
 
 
 class MachineEventConsumer(Protocol):
