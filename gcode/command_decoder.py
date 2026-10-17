@@ -9,4 +9,45 @@ class CommandDecoder:
         current_code: CommandCode | None = None
         params: list[Word] = []
 
+        for word in parsed_line.words:
+            if word.letter in ("G", "M"):
+                # Finish the previous command, if any.
+                if current_code is not None:
+                    commands.append(
+                        Command(
+                            code=current_code,
+                            params=tuple(params),
+                            line_number=line_number,
+                        )
+                    )
+                    params = []
+                elif params:
+                    # Parameters appeared before a command code.
+                    commands.append(
+                        Command(
+                            code=None,
+                            params=tuple(params),
+                            line_number=line_number,
+                        )
+                    )
+                    params = []
+
+                current_code = CommandCode(
+                    letter=word.letter,
+                    number=word.value,
+                )
+
+            else:
+                params.append(word)
+
+        # Finish the final command or parameter-only line.
+        if current_code is not None or params:
+            commands.append(
+                Command(
+                    code=current_code,
+                    params=tuple(params),
+                    line_number=line_number,
+                )
+            )
+
         return commands
