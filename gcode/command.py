@@ -1,8 +1,16 @@
 from dataclasses import dataclass
 
+from gcode.lexer import Word
+
+
+@dataclass(frozen=True)
+class CommandCode:
+    letter: str  # "G" or "M"
+    code: int | float
+
 
 @dataclass(frozen=True)
 class Command:
-    letter: str
-    code: int
-    params: dict[str, float]
+    code: CommandCode
+    params: tuple[Word, ...]
+    line_number: int
