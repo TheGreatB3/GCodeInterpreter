@@ -11,6 +11,11 @@ class CommandDecoder:
 
         for word in parsed_line.words:
             if word.letter in ("G", "M"):
+                if not isinstance(word.value, (int, float)):
+                    raise SyntaxError(
+                        f"Command {word.letter} code must be a number, got {word.value!r}"
+                    )
+
                 # Finish the previous command, if any.
                 if current_code is not None:
                     commands.append(
