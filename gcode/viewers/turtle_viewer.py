@@ -1,15 +1,14 @@
 import turtle
 
+from gcode.layer import Layer
 from gcode.path import PathSegment
-
-type Layer = tuple[float, list[PathSegment]]
 
 window_width = 1920.0
 window_height = 1080.0
 padding = 80.0
 
 
-def view_layer(
+def view_layers(
         layers: list[Layer],
         *,
         initial_layer: int = 0,
@@ -38,7 +37,7 @@ def view_layer(
     def drawable_segments_for(index: int) -> list[PathSegment]:
         return [
             segment
-            for segment in layers[index][1]
+            for segment in layers[index].segments
             if show_travel or segment.extruding
         ]
 
@@ -81,7 +80,7 @@ def view_layer(
         return projected_x, projected_y
 
     def draw_status(index: int, drawable_count: int) -> None:
-        z, segments = layers[index]
+        layer = layers[index]
 
         status_pen.clear()
         status_pen.goto(-window_width / 2 + padding, window_height / 2 - padding)
@@ -89,8 +88,8 @@ def view_layer(
         status_pen.write(
             (
                 f"Layer {index} / {len(layers) - 1}  "
-                f"Z={z:g}  "
-                f"segments={len(segments)}  "
+                f"Z={layer.z :g}  "
+                f"segments={len(layer.segments)}  "
                 f"drawn={drawable_count}  "
                 "controls: ←/p previous, →/n next, Home first, End last, q quit"
             ),
@@ -102,10 +101,10 @@ def view_layer(
         nonlocal layer_index
 
         layer_index = index
-        z, _segments = layers[layer_index]
+        layer = layers[layer_index]
         drawable_segments = drawable_segments_for(layer_index)
 
-        screen.title(f"G-code layer {layer_index} at Z={z:g}")
+        screen.title(f"G-code layer {layer_index} at Z={layer.z:g}")
         pen.clear()
         draw_status(layer_index, len(drawable_segments))
 

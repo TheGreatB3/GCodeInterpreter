@@ -5,10 +5,11 @@ from typing import TextIO, Protocol
 
 from gcode.command import Command
 from gcode.command_decoder import CommandDecoder
+from gcode.layer import LayerTracker
 from gcode.lexer import lex_line, Word, Comment
 from gcode.parser import parse_line, ParsedLine
-from gcode.path import PathExtractor, PathSegment, group_segments_by_layer
-from gcode.viewers.turtle_viewer import view_layer
+from gcode.path import PathExtractor, PathSegment
+from gcode.viewers.turtle_viewer import view_layers
 
 
 class ProcessingMode(Protocol):
@@ -85,41 +86,19 @@ class TurtleMode(PathMode):
         super().__init__()
         self.layer = layer
         self.show_travel = show_travel
-        self.comment_layers: list[tuple[float, list[PathSegment]]] = []
-        self.current_layer_segments: list[PathSegment] = []
-        self.current_layer_z = 0.0
-        self.pending_layer_change = False
-        self.saw_layer_change = False
+        self.layer_tracker = LayerTracker()
 
     def on_parsed(self, line_number: int, parsed: ParsedLine) -> None:
-        for comment in parsed.comments:
-            text = comment.text.strip()
-
-            if text == "LAYER_CHANGE":
-                self._finish_current_comment_layer()
-                self.pending_layer_change = True
-                self.saw_layer_change = True
-                continue
-
-            if self.pending_layer_change and text.startswith("Z:"):
-                try:
-                    self.current_layer_z = float(text.removeprefix("Z:"))
-                except ValueError:
-                    pass
+        self.layer_tracker.on_parsed(parsed)
 
     def on_commands(self, line_number: int, commands: list[Command]) -> None:
         for command in commands:
             segments = self.extractor.execute(command)
             self.segments.extend(segments)
-            self.current_layer_segments.extend(segments)
+            self.layer_tracker.on_segments(segments)
 
     def finish(self) -> None:
-        self._finish_current_comment_layer()
-
-        if self.saw_layer_change:
-            layers = self.comment_layers
-        else:
-            layers = group_segments_by_layer(self.segments)
+        layers = self.layer_tracker.finish(self.segments)
 
         if not layers:
             print("No path segments found.")
@@ -138,29 +117,16 @@ class TurtleMode(PathMode):
             )
             return
 
-        z, segments = layers[selected_layer]
         print(
             f"Viewing layer {selected_layer} / {len(layers) - 1} "
-            f"at Z={z:g} with {len(segments)} segments",
+            "Use arrow keys, n/p, Home/End, or q.",
         )
 
-        view_layer(
+        view_layers(
             layers,
             initial_layer=selected_layer,
             show_travel=self.show_travel,
         )
-
-    def _finish_current_comment_layer(self) -> None:
-        if not self.current_layer_segments:
-            return
-
-        self.comment_layers.append((
-            self.current_layer_z,
-            self.current_layer_segments,
-        ))
-
-        self.current_layer_segments = []
-        self.pending_layer_change = False
 
 
 def process_stream(stream: TextIO, mode: ProcessingMode) -> int:
