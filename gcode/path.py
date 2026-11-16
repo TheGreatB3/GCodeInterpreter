@@ -161,3 +161,21 @@ class PathExtractor:
         if absolute:
             return value
         return current + value
+
+
+def group_segments_by_layer(
+        segments: list[PathSegment],
+        *,
+        z_tolerance: float = 0.0001,
+) -> list[tuple[float, list[PathSegment]]]:
+    layers: list[tuple[float, list[PathSegment]]] = []
+
+    for segment in segments:
+        z = segment.end.z
+
+        if not layers or abs(layers[-1][0] - z) > z_tolerance:
+            layers.append((z, [segment]))
+        else:
+            layers[-1][1].append(segment)
+
+    return layers
