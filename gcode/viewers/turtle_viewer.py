@@ -4,8 +4,8 @@ from gcode.path import PathSegment
 
 type Layer = tuple[float, list[PathSegment]]
 
-window_width = 1000.0
-window_height = 800.0
+window_width = 1920.0
+window_height = 1080.0
 padding = 80.0
 
 
@@ -23,6 +23,7 @@ def view_layer(
 
     screen = turtle.Screen()
     screen.setup(width=window_width, height=window_height)
+    screen.tracer(0)
 
     pen = turtle.Turtle()
     pen.hideturtle()
@@ -40,6 +41,44 @@ def view_layer(
             for segment in layers[index][1]
             if show_travel or segment.extruding
         ]
+
+    all_drawable_segments = [
+        segment
+        for layer_idx in range(len(layers))
+        for segment in drawable_segments_for(layer_idx)
+    ]
+
+    if not all_drawable_segments:
+        screen.update()
+        return
+
+    points = [
+        point
+        for segment in all_drawable_segments
+        for point in (segment.start, segment.end)
+    ]
+
+    min_x = min(point.x for point in points)
+    max_x = max(point.x for point in points)
+    min_y = min(point.y for point in points)
+    max_y = max(point.y for point in points)
+
+    width = max_x - min_x
+    height = max_y - min_y
+    center_x = (min_x + max_x) / 2.0
+    center_y = (min_y + max_y) / 2.0
+
+    drawable_width = window_width - 2 * padding
+    drawable_height = window_height - 2 * padding
+
+    scale_x = drawable_width / width if width else 1.0
+    scale_y = drawable_height / height if height else 1.0
+    scale = min(scale_x, scale_y)
+
+    def project(x: float, y: float) -> tuple[float, float]:
+        projected_x = (x - center_x) * scale
+        projected_y = (y - center_y) * scale
+        return projected_x, projected_y
 
     def draw_status(index: int, drawable_count: int) -> None:
         z, segments = layers[index]
@@ -73,28 +112,6 @@ def view_layer(
         if not drawable_segments:
             screen.update()
             return
-
-        min_x = min(min(segment.start.x, segment.end.x) for segment in drawable_segments)
-        max_x = max(max(segment.start.x, segment.end.x) for segment in drawable_segments)
-        min_y = min(min(segment.start.y, segment.end.y) for segment in drawable_segments)
-        max_y = max(max(segment.start.y, segment.end.y) for segment in drawable_segments)
-
-        width = max_x - min_x
-        height = max_y - min_y
-        center_x = (min_x + max_x) / 2.0
-        center_y = (min_y + max_y) / 2.0
-
-        drawable_width = window_width - 2 * padding
-        drawable_height = window_height - 2 * padding
-
-        scale_x = drawable_width / width if width else 1.0
-        scale_y = drawable_height / height if height else 1.0
-        scale = min(scale_x, scale_y)
-
-        def project(x: float, y: float) -> tuple[float, float]:
-            projected_x = (x - center_x) * scale
-            projected_y = (y - center_y) * scale
-            return projected_x, projected_y
 
         for segment in drawable_segments:
             pen.color("red" if segment.extruding else "gray")
