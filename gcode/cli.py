@@ -82,11 +82,13 @@ class PathMode(BaseMode):
 
 
 class TurtleMode(PathMode):
-    def __init__(self, *, layer: int | None, show_travel: bool) -> None:
+    def __init__(self, *, layer: int | None, show_travel: bool, ignore_before_first_layer: bool) -> None:
         super().__init__()
         self.layer = layer
         self.show_travel = show_travel
-        self.layer_tracker = LayerTracker()
+        self.layer_tracker = LayerTracker(
+            ignore_before_first_layer=ignore_before_first_layer
+        )
 
     def on_parsed(self, line_number: int, parsed: ParsedLine) -> None:
         self.layer_tracker.on_parsed(parsed)
@@ -165,6 +167,7 @@ def create_mode(args: argparse.Namespace) -> ProcessingMode:
         return TurtleMode(
             layer=args.layer,
             show_travel=args.show_travel,
+            ignore_before_first_layer=args.ignore_before_first_layer,
         )
     return SummaryMode()
 
@@ -218,6 +221,11 @@ def main() -> int:
         "--show-travel",
         action="store_true",
         help="Show non-extruding travel moves in Turtle views.",
+    )
+    parser.add_argument(
+        "--ignore-before-first-layer",
+        action="store_true",
+        help="Ignore path segments before the first LAYER_CHANGE comment.",
     )
 
     args = parser.parse_args()

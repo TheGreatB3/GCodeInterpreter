@@ -13,6 +13,7 @@ class Layer:
 
 @dataclass
 class LayerTracker:
+    ignore_before_first_layer: bool = False
     layers: list[Layer] = field(default_factory=list)
     current_segments: list[PathSegment] = field(default_factory=list)
     current_z: float = 0.0
@@ -33,6 +34,9 @@ class LayerTracker:
                 self._set_pending_layer_z(text)
 
     def on_segments(self, segments: list[PathSegment]) -> None:
+        if self.ignore_before_first_layer and not self.saw_layer_change:
+            return
+
         self.current_segments.extend(segments)
 
     def finish(self, fallback_segments: list[PathSegment]) -> list[Layer]:
