@@ -85,9 +85,41 @@ class TurtleMode(PathMode):
         super().__init__()
         self.layer = layer
         self.show_travel = show_travel
+        self.comment_layers: list[tuple[float, list[PathSegment]]] = []
+        self.current_layer_segments: list[PathSegment] = []
+        self.current_layer_z = 0.0
+        self.pending_layer_change = False
+        self.saw_layer_change = False
+
+    def on_parsed(self, line_number: int, parsed: ParsedLine) -> None:
+        for comment in parsed.comments:
+            text = comment.text.strip()
+
+            if text == "LAYER_CHANGE":
+                self._finish_current_comment_layer()
+                self.pending_layer_change = True
+                self.saw_layer_change = True
+                continue
+
+            if self.pending_layer_change and text.startswith("Z:"):
+                try:
+                    self.current_layer_z = float(text.removeprefix("Z:"))
+                except ValueError:
+                    pass
+
+    def on_commands(self, line_number: int, commands: list[Command]) -> None:
+        for command in commands:
+            segments = self.extractor.execute(command)
+            self.segments.extend(segments)
+            self.current_layer_segments.extend(segments)
 
     def finish(self) -> None:
-        layers = group_segments_by_layer(self.segments)
+        self._finish_current_comment_layer()
+
+        if self.saw_layer_change:
+            layers = self.comment_layers
+        else:
+            layers = group_segments_by_layer(self.segments)
 
         if not layers:
             print("No path segments found.")
@@ -117,6 +149,18 @@ class TurtleMode(PathMode):
             initial_layer=selected_layer,
             show_travel=self.show_travel,
         )
+
+    def _finish_current_comment_layer(self) -> None:
+        if not self.current_layer_segments:
+            return
+
+        self.comment_layers.append((
+            self.current_layer_z,
+            self.current_layer_segments,
+        ))
+
+        self.current_layer_segments = []
+        self.pending_layer_change = False
 
 
 def process_stream(stream: TextIO, mode: ProcessingMode) -> int:
