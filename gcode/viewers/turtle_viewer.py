@@ -7,6 +7,9 @@ from gcode.path import PathSegment
 window_width = 1920.0
 window_height = 1080.0
 padding = 80.0
+legend_padding = 24.0
+legend_item_height = 24.0
+legend_swatch_size = 12.0
 
 
 def view_layers(
@@ -37,12 +40,67 @@ def view_layers(
     status_pen.speed(0)
     status_pen.penup()
 
+    legend_pen = turtle.Turtle()
+    legend_pen.hideturtle()
+    legend_pen.speed(0)
+    legend_pen.penup()
+
     def drawable_segments_for(index: int) -> list[TypedPathSegment]:
         return [
             segment
             for segment in layers[index].segments
             if show_travel or segment.segment.extruding
         ]
+
+    def draw_legend(index: int) -> None:
+        layer = layers[index]
+        extrusion_types = sorted(
+            {
+                typed_segment.extrusion_type
+                for typed_segment in layer.segments
+                if show_travel or typed_segment.segment.extruding
+            },
+            key=lambda extrusion_type: extrusion_type.value
+        )
+
+        legend_pen.clear()
+
+        if not extrusion_types:
+            return
+
+        x = window_width / 2 - padding - 220
+        y = window_height / 2 - padding - 8
+
+        legend_pen.goto(x, y)
+        legend_pen.color("black")
+        legend_pen.write(
+            "Extrusion types",
+            align="left",
+            font=("Arial", 12, "bold")
+        )
+
+        for row, extrusion_type in enumerate(extrusion_types, start=1):
+            item_y = y - row * legend_item_height
+            color = EXTRUSION_TYPE_COLORS[extrusion_type]
+
+            legend_pen.penup()
+            legend_pen.goto(x, item_y)
+            legend_pen.color(color)
+            legend_pen.begin_fill()
+            legend_pen.pendown()
+            for _ in range(4):
+                legend_pen.forward(legend_swatch_size)
+                legend_pen.right(90)
+            legend_pen.end_fill()
+            legend_pen.penup()
+
+            legend_pen.goto(x + legend_swatch_size + 8, item_y - legend_swatch_size)
+            legend_pen.color("black")
+            legend_pen.write(
+                extrusion_type.value,
+                align="left",
+                font=("Arial", 10, "normal"),
+            )
 
     all_drawable_segments = [
         segment
@@ -110,6 +168,7 @@ def view_layers(
         screen.title(f"G-code layer {layer_index} at Z={layer.z:g}")
         pen.clear()
         draw_status(layer_index, len(drawable_segments))
+        draw_legend(layer_index)
 
         if not drawable_segments:
             screen.update()
