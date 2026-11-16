@@ -3,27 +3,41 @@ import sys
 from pathlib import Path
 from typing import TextIO
 
+from gcode.command_decoder import CommandDecoder
 from gcode.lexer import lex_line
 from gcode.parser import parse_line
 
 
-def process_stream(stream: TextIO, *, show_tokens: bool) -> int:
+def iter_parsed_lines(stream: TextIO):
     for line_number, source in enumerate(stream, start=1):
         try:
             tokens = lex_line(source)
             parsed = parse_line(tokens)
 
-            if show_tokens:
-                print(f"{line_number}: {tokens!r}")
-            else:
-                print(f"{line_number}: {parsed!r}")
-
+            yield line_number, parsed
         except SyntaxError as error:
             print(
                 f"Error on line {line_number}: {error}",
                 file=sys.stderr,
             )
-            return 1
+            raise
+
+
+def process_stream(stream: TextIO) -> int:
+    decoder = CommandDecoder()
+
+    try:
+        for line_number, parsed in iter_parsed_lines(stream):
+            command = decoder.decode(parsed, line_number=line_number)
+
+            if command is None:
+                continue
+
+            # Do something useful with the command.
+            print(f"{line_number}: {command!r}")
+
+    except SyntaxError:
+        return 1
 
     return 0
 
@@ -55,11 +69,11 @@ def main() -> int:
     args = parser.parse_args()
 
     if str(args.file) == "-":
-        return process_stream(sys.stdin, show_tokens=args.tokens)
+        return process_stream(sys.stdin)
 
     try:
         with args.file.open(encoding="utf-8") as stream:
-            return process_stream(stream, show_tokens=args.tokens)
+            return process_stream(stream)
     except OSError as error:
         print(f"Cannot open {args.file}: {error}", file=sys.stderr)
         return 1
