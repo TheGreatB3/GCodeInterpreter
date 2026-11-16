@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from gcode.parser import ParsedLine
+from gcode.path import PathSegment
 
 
 class GCodeExtrusionType(Enum):
@@ -51,6 +52,19 @@ EXTRUSION_TYPE_COLORS = {
 }
 
 
+@dataclass(frozen=True)
+class TypedPathSegment:
+    segment: PathSegment
+    extrusion_type: GCodeExtrusionType
+
+
+def _parse_extrusion_type(value: str) -> GCodeExtrusionType:
+    try:
+        return GCodeExtrusionType(value)
+    except ValueError:
+        return GCodeExtrusionType.CUSTOM
+
+
 @dataclass
 class ExtrusionTracker:
     current_extrusion_type: GCodeExtrusionType = GCodeExtrusionType.NONE
@@ -59,4 +73,13 @@ class ExtrusionTracker:
         for comment in parsed.comments:
             text = comment.text.strip()
             if text.startswith("TYPE:"):
-                self.current_extrusion_type = GCodeExtrusionType(text.removeprefix("TYPE:"))
+                self.current_extrusion_type = _parse_extrusion_type(text.removeprefix("TYPE:"))
+
+    def apply_to_segments(self, segments: list[PathSegment]) -> list[TypedPathSegment]:
+        return [
+            TypedPathSegment(
+                segment=segment,
+                extrusion_type=self.current_extrusion_type if segment.extruding else GCodeExtrusionType.NONE,
+            )
+            for segment in segments
+        ]
