@@ -7,6 +7,8 @@ from gcode.command import Command
 from gcode.command_decoder import CommandDecoder
 from gcode.lexer import lex_line, Word, Comment
 from gcode.parser import parse_line, ParsedLine
+from gcode.path import PathExtractor, PathSegment, group_segments_by_layer
+from gcode.viewers.turtle_viewer import view_layer
 
 
 class ProcessingMode(Protocol):
@@ -68,6 +70,55 @@ class SummaryMode(BaseMode):
         print(f"Commands: {self.command_count}")
 
 
+class PathMode(BaseMode):
+    def __init__(self) -> None:
+        self.extractor = PathExtractor()
+        self.segments: list[PathSegment] = []
+
+    def on_commands(self, line_number: int, commands: list[Command]) -> None:
+        for command in commands:
+            self.segments.extend(self.extractor.execute(command))
+
+
+class TurtleMode(PathMode):
+    def __init__(self, *, layer: int | None, show_travel: bool) -> None:
+        super().__init__()
+        self.layer = layer
+        self.show_travel = show_travel
+
+    def finish(self) -> None:
+        layers = group_segments_by_layer(self.segments)
+
+        if not layers:
+            print("No path segments found.")
+            return
+
+        if self.layer is None:
+            selected_layer = 0
+        else:
+            selected_layer = self.layer
+
+        if selected_layer < 0 or selected_layer >= len(layers):
+            print(
+                f"Layer {selected_layer} is out of range. "
+                f"Available layers: 0 to {len(layers) - 1}",
+                file=sys.stderr,
+            )
+            return
+
+        z, segments = layers[selected_layer]
+        print(
+            f"Viewing layer {selected_layer} / {len(layers) - 1} "
+            f"at Z={z:g} with {len(segments)} segments",
+        )
+
+        view_layer(
+            segments,
+            title=f"G-code layer {selected_layer} at Z={z:g}",
+            show_travel=self.show_travel,
+        )
+
+
 def process_stream(stream: TextIO, mode: ProcessingMode) -> int:
     decoder = CommandDecoder()
 
@@ -100,6 +151,11 @@ def create_mode(args: argparse.Namespace) -> ProcessingMode:
         return ParseMode()
     if args.commands:
         return CommandMode()
+    if args.turtle:
+        return TurtleMode(
+            layer=args.layer,
+            show_travel=args.show_travel,
+        )
     return SummaryMode()
 
 
@@ -132,9 +188,26 @@ def main() -> int:
         help="Print decoded commands",
     )
     mode.add_argument(
+        "--turtle",
+        action="store_true",
+        help="View the filament path for one layer using Turtle graphics",
+    )
+    mode.add_argument(
         "--summary",
         action="store_true",
         help="Print a short file summary",
+    )
+
+    parser.add_argument(
+        "--layer",
+        type=int,
+        default=None,
+        help="Layer index to view with --turtle. Defaults to 0.",
+    )
+    parser.add_argument(
+        "--show-travel",
+        action="store_true",
+        help="Show non-extruding travel moves in Turtle views.",
     )
 
     args = parser.parse_args()
