@@ -84,7 +84,7 @@ def view_layer(
         z, segments = layers[index]
 
         status_pen.clear()
-        status_pen.goto(-480, 360)
+        status_pen.goto(-window_width / 2 + padding, window_height / 2 - padding)
         status_pen.color("black")
         status_pen.write(
             (
