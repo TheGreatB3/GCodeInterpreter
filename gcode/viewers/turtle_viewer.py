@@ -2,7 +2,6 @@ import turtle
 
 from gcode.extrusion import TypedPathSegment, EXTRUSION_TYPE_COLORS
 from gcode.layer import Layer
-from gcode.path import PathSegment
 
 window_width = 1920.0
 window_height = 1080.0
