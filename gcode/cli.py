@@ -5,6 +5,7 @@ from typing import TextIO, Protocol
 
 from gcode.command import Command
 from gcode.command_decoder import CommandDecoder
+from gcode.extrusion import TypedPathSegment, ExtrusionTracker
 from gcode.layer import LayerTracker
 from gcode.lexer import lex_line, Word, Comment
 from gcode.parser import parse_line, ParsedLine
@@ -86,21 +87,27 @@ class TurtleMode(PathMode):
         super().__init__()
         self.layer = layer
         self.show_travel = show_travel
+        self.extrusion_tracker = ExtrusionTracker()
         self.layer_tracker = LayerTracker(
             ignore_before_first_layer=ignore_before_first_layer
         )
+        self.typed_segments: list[TypedPathSegment] = []
 
     def on_parsed(self, line_number: int, parsed: ParsedLine) -> None:
+        self.extrusion_tracker.on_parsed(parsed)
         self.layer_tracker.on_parsed(parsed)
 
     def on_commands(self, line_number: int, commands: list[Command]) -> None:
         for command in commands:
             segments = self.extractor.execute(command)
+            typed_segments = self.extrusion_tracker.apply_to_segments(segments)
+
             self.segments.extend(segments)
-            self.layer_tracker.on_segments(segments)
+            self.typed_segments.extend(typed_segments)
+            self.layer_tracker.on_segments(typed_segments)
 
     def finish(self) -> None:
-        layers = self.layer_tracker.finish(self.segments)
+        layers = self.layer_tracker.finish(self.typed_segments)
 
         if not layers:
             print("No path segments found.")

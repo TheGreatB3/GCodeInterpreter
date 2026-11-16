@@ -1,21 +1,22 @@
 from dataclasses import dataclass, field
 
+from gcode.extrusion import TypedPathSegment
 from gcode.parser import ParsedLine
-from gcode.path import PathSegment, group_segments_by_layer
+from gcode.path import group_segments_by_layer
 
 
 @dataclass(frozen=True)
 class Layer:
     index: int
     z: float
-    segments: tuple[PathSegment, ...]
+    segments: tuple[TypedPathSegment, ...]
 
 
 @dataclass
 class LayerTracker:
     ignore_before_first_layer: bool = False
     layers: list[Layer] = field(default_factory=list)
-    current_segments: list[PathSegment] = field(default_factory=list)
+    current_segments: list[TypedPathSegment] = field(default_factory=list)
     current_z: float = 0.0
     saw_layer_change: bool = False
     pending_layer_change: bool = False
@@ -33,13 +34,13 @@ class LayerTracker:
             if self.pending_layer_change and text.startswith("Z:"):
                 self._set_pending_layer_z(text)
 
-    def on_segments(self, segments: list[PathSegment]) -> None:
+    def on_segments(self, segments: list[TypedPathSegment]) -> None:
         if self.ignore_before_first_layer and not self.saw_layer_change:
             return
 
         self.current_segments.extend(segments)
 
-    def finish(self, fallback_segments: list[PathSegment]) -> list[Layer]:
+    def finish(self, fallback_segments: list[TypedPathSegment]) -> list[Layer]:
         self.finish_current_layer()
 
         if self.saw_layer_change:
@@ -49,9 +50,15 @@ class LayerTracker:
             Layer(
                 index=index,
                 z=z,
-                segments=tuple(segments),
+                segments=tuple(
+                    segment
+                    for segment in fallback_segments
+                    if segment.segment in raw_segments
+                ),
             )
-            for index, (z, segments) in enumerate(group_segments_by_layer(fallback_segments))
+            for index, (z, raw_segments) in enumerate(
+                group_segments_by_layer([segment.segment for segment in fallback_segments]),
+            )
         ]
 
     def finish_current_layer(self) -> None:

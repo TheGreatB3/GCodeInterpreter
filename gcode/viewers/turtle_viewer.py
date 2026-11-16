@@ -1,5 +1,6 @@
 import turtle
 
+from gcode.extrusion import TypedPathSegment, EXTRUSION_TYPE_COLORS
 from gcode.layer import Layer
 from gcode.path import PathSegment
 
@@ -18,6 +19,8 @@ def view_layers(
         print("No layers to view.")
         return
 
+    turtle.colormode(255)
+
     layer_index = max(0, min(initial_layer, len(layers) - 1))
 
     screen = turtle.Screen()
@@ -34,11 +37,11 @@ def view_layers(
     status_pen.speed(0)
     status_pen.penup()
 
-    def drawable_segments_for(index: int) -> list[PathSegment]:
+    def drawable_segments_for(index: int) -> list[TypedPathSegment]:
         return [
             segment
             for segment in layers[index].segments
-            if show_travel or segment.extruding
+            if show_travel or segment.segment.extruding
         ]
 
     all_drawable_segments = [
@@ -53,8 +56,8 @@ def view_layers(
 
     points = [
         point
-        for segment in all_drawable_segments
-        for point in (segment.start, segment.end)
+        for typed_segment in all_drawable_segments
+        for point in (typed_segment.segment.start, typed_segment.segment.end)
     ]
 
     min_x = min(point.x for point in points)
@@ -112,8 +115,11 @@ def view_layers(
             screen.update()
             return
 
-        for segment in drawable_segments:
-            pen.color("red" if segment.extruding else "gray")
+        for typed_segment in drawable_segments:
+            segment = typed_segment.segment
+            color = EXTRUSION_TYPE_COLORS[typed_segment.extrusion_type]
+
+            pen.color(color)
             pen.pensize(2 if segment.extruding else 1)
 
             start_x, start_y = project(segment.start.x, segment.start.y)
