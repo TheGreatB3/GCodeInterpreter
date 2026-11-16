@@ -113,8 +113,8 @@ class TurtleMode(PathMode):
         )
 
         view_layer(
-            segments,
-            title=f"G-code layer {selected_layer} at Z={z:g}",
+            layers,
+            initial_layer=selected_layer,
             show_travel=self.show_travel,
         )
 
