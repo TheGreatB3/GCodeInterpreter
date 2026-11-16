@@ -22,7 +22,7 @@ def view_layer(
     layer_index = max(0, min(initial_layer, len(layers) - 1))
 
     screen = turtle.Screen()
-    screen.setup(width=1000, height=800)
+    screen.setup(width=window_width, height=window_height)
 
     pen = turtle.Turtle()
     pen.hideturtle()
