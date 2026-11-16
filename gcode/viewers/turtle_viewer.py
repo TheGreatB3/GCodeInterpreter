@@ -4,6 +4,10 @@ from gcode.path import PathSegment
 
 type Layer = tuple[float, list[PathSegment]]
 
+window_width = 1000.0
+window_height = 800.0
+padding = 80.0
+
 
 def view_layer(
         layers: list[Layer],
@@ -77,18 +81,19 @@ def view_layer(
 
         width = max_x - min_x
         height = max_y - min_y
+        center_x = (min_x + max_x) / 2.0
+        center_y = (min_y + max_y) / 2.0
 
-        margin = 40.0
-        canvas_width = 920
-        canvas_height = 720
+        drawable_width = window_width - 2 * padding
+        drawable_height = window_height - 2 * padding
 
-        scale_x = canvas_width / width if width else 1.0
-        scale_y = canvas_height / height if height else 1.0
+        scale_x = drawable_width / width if width else 1.0
+        scale_y = drawable_height / height if height else 1.0
         scale = min(scale_x, scale_y)
 
         def project(x: float, y: float) -> tuple[float, float]:
-            projected_x = ((x - min_x) * scale) - (canvas_width / 2.0) + margin
-            projected_y = ((y - min_y) * scale) - (canvas_height / 2.0) + margin
+            projected_x = (x - center_x) * scale
+            projected_y = (y - center_y) * scale
             return projected_x, projected_y
 
         for segment in drawable_segments:
